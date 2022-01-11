@@ -2,7 +2,7 @@
 project test data kode pos
 
 1. Menggunakan VS 2019
-2. .Net Core 5.0
+2. C# .Net Core 5.0
 3. Framework Web UI adalah Blazor App Server
 4. Menggunakan Arsitektur Model-View-Controller
 5. Bisnis Logic Layer : Data Access Service, Data Interface, API Data Controller

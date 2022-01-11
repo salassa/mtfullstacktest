@@ -1,0 +1,627 @@
+﻿@page "/"
+
+@inject HttpClient _httpClient
+@using System.Net.Http.Json
+@using System.Text.Json
+@using System.Text
+
+@using mtfullstacktest.Data
+@inject IJSRuntime JSRuntime
+
+@inject Data.GlobalService globalservice
+@inject Data.DatakodeposInterface IDatakodepos
+
+
+@if (isLoading)
+{
+    <div class="spinner"></div>
+}
+
+<div class="row">
+    <div class="col-sm-12 padding0">
+
+        <table class="width100">
+            <tr>
+                <td>
+                    <div class="row">
+                        <div class="col-md-2">
+                            <button type="button" class="input-group-btn btn-sm btn-orange" @onclick="@(async () => await NewData())">
+                                <span class="oi oi-plus mr-2" aria-hidden="true" />
+                                New
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 col-sm-6">
+                            <label for="tbfilterprov" class="control-label" style="margin-bottom:0 !important;">Filter Provinsi </label>
+                            <input type="text" class="form-control form-control-sm" @bind="@fprovinsi" />
+                        </div>
+                        <div class="col-md-6 col-sm-6">
+                            <label for="tbfilterkab" class="control-label" style="margin-bottom:0 !important;">Filter Kabupaten </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" @bind="@fkabupaten" />
+                                <button type="button" class="input-group-btn btn-sm btn-orange" @onclick="@(async () => await filterData())">
+                                    <span class="oi oi-zoom-out mr-2" aria-hidden="true" />
+                                    Search
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <table id="tblData" class="table table-sm table-scroll-vertical table-striped table-responsive-sm styledatatable width100">
+
+            <thead class="text-center aqua-gradient-rgba">
+                <tr>
+                    <th class="width10">&#9776;</th>
+                    <th class="width10">Kode POS</th>
+                    <th class="width25">Kelurahan</th>
+                    <th class="width25">Kecamatan</th>
+                    <th class="width20">Kabupaten</th>
+                    <th class="width20">Provinsi</th>
+                    <th class="width10">Jenis</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (datakodeposList != null)
+                {
+                    @foreach (var item in datakodeposList)
+                    {
+                        <tr style="vertical-align:central !important;" >
+                            <td>
+                                <span class="oi oi-pencil mr-2" aria-hidden="true" @onclick="@(async () => await SelectData(item.rowid))"/>
+                                <span class="oi oi-trash mr-2" aria-hidden="true" @onclick="@(async () => await ConfirmDelete(item.rowid))"/>
+                            </td>
+                            <td class="itemdata-left">
+                                @item.nokdpos
+                            </td>
+                            <td class="itemdata-left">
+                                @item.kelurahan
+                            </td>
+                            <td class="itemdata-left">
+                                @item.kecamatan
+                            </td>
+                            <td class="itemdata-left">
+                                @item.kabupaten
+                            </td>
+                            <td class="itemdata-left">
+                                @item.provinsi
+                            </td>
+                            <td class="itemdata-left">
+                                @item.jenis
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+    </div>
+</div>
+<div class="row fixpagingfooter">
+    <div>
+        <button class="btn btn-orange btn-sm" @onclick=@(async ()=>await NavigateToPage("previous"))>Prev</button>
+
+        @for (int i = startPage; i <= endPage; i++)
+        {
+            var currentPage = i;
+            <button class="btn  @(currentPage==curPage?"btn-merah":"") btn-sm" @onclick=@(async () =>await refreshRecords(currentPage))>
+                @currentPage
+            </button>
+        }
+
+        <button class="btn  btn-hijau btn-sm">
+            Total: @totalRecords
+        </button>
+        <button class="btn btn-orange btn-sm" @onclick=@(async ()=>await NavigateToPage("next"))>Next</button>
+    </div>
+</div>
+
+<div id="pupFormkodepos" class="modal animate__slideInUp" tabindex="-1" style="display:none;" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header aqua-gradient-rgba">
+                <h6 class="modal-title">@FormTitle</h6>
+                <a class="close" data-dismiss="modal">
+                    <span class="oi oi-circle-x mr-2" aria-hidden="true" />
+                </a>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-sm-2">
+                        <label for="tbnokdpos" class="control-label" style="margin-bottom:0 !important;">Kode POS </label>
+                        <input type="text" id="tbnokdpos" @bind="@datakodeposModel.nokdpos" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="tbkelurahan" class="control-label" style="margin-bottom:0 !important;">Kelurahan</label>
+                        <input type="text" id="tbkelurahan" @bind="@datakodeposModel.kelurahan" class="form-control form-control-sm" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <label for="tbkecamatan" class="control-label" style="margin-bottom:0 !important;">Kecamatan </label>
+                        <input type="text" id="tbkecamatan" @bind="@datakodeposModel.kecamatan" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="tbkabupaten" class="control-label" style="margin-bottom:0 !important;">Kabupaten</label>
+                        <input type="text" id="tbkabupaten" @bind="@datakodeposModel.kabupaten" class="form-control form-control-sm" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <label for="tbprovinsi" class="control-label" style="margin-bottom:0 !important;">Provinsi </label>
+                        <input type="text" id="tbprovinsi" @bind="@datakodeposModel.provinsi" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="tbjenis" class="control-label" style="margin-bottom:0 !important;">Jenis</label>
+                        <input type="text" id="tbjenis" @bind="@datakodeposModel.jenis" class="form-control form-control-sm" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-10">
+
+                    </div>
+                    <div class="col-sm-2">
+                        <button id="btnSaveData" class="btn btn-biru btn-sm" @onclick="@(() => ExecuteAsyncSavedata())">
+                            <span class="fa fa-save" aria-hidden="true" /> Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="pupWarning" class="modal fade-out-down" tabindex="-1" style="display:none" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">@modalTitle</h6>
+                <a class="close" data-dismiss="modal">X</a>
+            </div>
+            <div class="modal-body">
+                <h6>@messageWarning</h6>
+
+            </div>
+            <div class="modal-footer backheadercard1">
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade-out-down" tabindex="-1" style="display:none" role="dialog" id="pupKonfirmasiDelete">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">Yakin ingin menghapus data berikut? </h6>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-sm-6">
+                        <label for="tbnokdpos" class="control-label" style="margin-bottom:0 !important;">Kode POS </label>
+                        <input type="text" id="tbnokdpos" @bind="@datakodeposModel.nokdpos" class="form-control form-control-sm" disabled/>
+                    </div>
+               </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label for="tbkelurahan" class="control-label" style="margin-bottom:0 !important;">Kelurahan</label>
+                        <input type="text" id="tbkelurahan" @bind="@datakodeposModel.kelurahan" class="form-control form-control-sm" disabled />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label for="tbkecamatan" class="control-label" style="margin-bottom:0 !important;">Kecamatan </label>
+                        <input type="text" id="tbkecamatan" @bind="@datakodeposModel.kecamatan" class="form-control form-control-sm" disabled/>
+                    </div>
+                 </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label for="tbkabupaten" class="control-label" style="margin-bottom:0 !important;">Kabupaten</label>
+                        <input type="text" id="tbkabupaten" @bind="@datakodeposModel.kabupaten" class="form-control form-control-sm" disabled />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label for="tbprovinsi" class="control-label" style="margin-bottom:0 !important;">Provinsi </label>
+                        <input type="text" id="tbprovinsi" @bind="@datakodeposModel.provinsi" class="form-control form-control-sm" disabled/>
+                    </div>
+                    
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label for="tbjenis" class="control-label" style="margin-bottom:0 !important;">Jenis</label>
+                        <input type="text" id="tbjenis" @bind="@datakodeposModel.jenis" class="form-control form-control-sm" disabled />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6"></div>
+                    <div class="col-sm-3">
+                        <button id="btnOkSave" class="btn btn-biru btn-sm" @onclick="@(() => ExcecuteDeleteData())">
+                            <span class="fa fa-check-circle" aria-hidden="true" /> Ya
+                        </button>
+                    </div>
+                    <div class="col-sm-3">
+                        <button id="btnCancelSave" class="btn btn-biru btn-sm" data-dismiss="modal">
+                            <span class="fa fa-repeat" aria-hidden="true" /> Tidak
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code{
+    protected Boolean isLoading = true;
+
+    public int totalPages { get; set; }
+    public int totalRecords { get; set; }
+    public int curPage { get; set; }
+    public int pagerSize { get; set; }
+    public int pageSize { get; set; }
+    public int startPage { get; set; }
+    public int endPage { get; set; } = 0;
+    string sortColumnName = "nokdpos";
+    string sortDir = "ASC";
+    public string fprovinsi { get; set; } = "-";
+    public string fkabupaten { get; set; } = "-";
+    private bool isSortedAscending;
+    private string activeSortColumn;
+
+    protected string FormTitle { get; set; } = "";
+
+    protected string modalTitle { get; set; } = "";
+    protected string messageWarning { get; set; } = "";
+
+    public List<DataModel> datakodeposList { get; set; } = new List<DataModel>();
+    DataModel datakodeposModel { get; set; } = new DataModel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            pagerSize = 10;
+            pageSize = 100;
+            curPage = 1;
+
+            datakodeposList = await BindataKodepos();
+            totalRecords = IDatakodepos.CountDataKodepos(fprovinsi, fkabupaten);
+            totalPages = (int)Math.Ceiling(totalRecords / (decimal)pageSize);
+            SetPagerSize("forward");
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async Task<List<DataModel>> BindataKodepos()
+    {
+        using (var response = await _httpClient.GetAsync(globalservice.GetBaseURL() + "/api/kodepos/list/" + (curPage - 1) * pageSize + "/" + pageSize + "/" + sortColumnName + "/" + fprovinsi + "/" + fkabupaten + "/" + sortDir, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+            var stream = await response.Content.ReadAsStreamAsync();
+            return await JsonSerializer.DeserializeAsync<List<DataModel>>(stream, null);
+        }
+    }
+    protected async Task filterData()
+    {
+        if (string.IsNullOrEmpty(fprovinsi)) { fprovinsi = "-"; }
+        if (string.IsNullOrEmpty(fkabupaten)) { fkabupaten = "-"; }
+
+        curPage = 1;
+        //startPage = 1;
+        //endPage = 1;
+        datakodeposList = await BindataKodepos();
+        totalRecords = IDatakodepos.CountDataKodepos(fprovinsi, fkabupaten);
+        totalPages = (int)Math.Ceiling(totalRecords / (decimal)pageSize);
+        SetPagerSize("forward");
+
+        StateHasChanged();
+    }
+    public async Task refreshRecords(int currentPage)
+    {
+        curPage = currentPage;
+        datakodeposList = await BindataKodepos();
+        this.StateHasChanged();
+    }
+    public void SetPagerSize(string direction)
+    {
+        if (direction == "forward" && endPage < totalPages)
+        {
+            startPage = endPage + 1;
+            if (endPage + pagerSize < totalPages)
+            {
+                endPage = startPage + pagerSize - 1;
+            }
+            else
+            {
+                endPage = totalPages;
+            }
+            this.StateHasChanged();
+        }
+        else if (direction == "back" && startPage > 1)
+        {
+            endPage = startPage - 1;
+            startPage = startPage - pagerSize;
+        }
+    }
+    public async Task NavigateToPage(string direction)
+    {
+        if (direction == "next")
+        {
+            if (curPage < totalPages)
+            {
+                if (curPage == endPage)
+                {
+                    SetPagerSize("forward");
+                }
+                curPage += 1;
+            }
+        }
+        else if (direction == "previous")
+        {
+            if (curPage > 1)
+            {
+                if (curPage == startPage)
+                {
+                    SetPagerSize("back");
+                }
+                curPage -= 1;
+            }
+        }
+        await refreshRecords(curPage);
+    }
+    private async Task<List<DataModel>> SortRecords(string columnName, string dir)
+    {
+        if (string.IsNullOrEmpty(fprovinsi)) { fprovinsi = "-"; }
+        if (string.IsNullOrEmpty(fkabupaten)) { fkabupaten = "-"; }
+
+        return await BindataKodepos();
+    }
+    private async Task SortTable(string columnName)
+    {
+        if (string.IsNullOrEmpty(fprovinsi)) { fprovinsi = "-"; }
+        if (string.IsNullOrEmpty(fkabupaten)) { fkabupaten = "-"; }
+        if (columnName != activeSortColumn)
+        {
+            datakodeposList = await SortRecords(columnName, "ASC");
+            isSortedAscending = true;
+            activeSortColumn = columnName;
+        }
+        else
+        {
+            if (isSortedAscending)
+            {
+                datakodeposList = await SortRecords(columnName, "DESC");
+            }
+            else
+            {
+                datakodeposList = await SortRecords(columnName, "ASC");
+            }
+            isSortedAscending = !isSortedAscending;
+        }
+        sortColumnName = columnName;
+        sortDir = isSortedAscending ? "ASC" : "DESC";
+    }
+    private string SetSortIcon(string columnName)
+    {
+        if (activeSortColumn != columnName)
+        {
+            return string.Empty;
+        }
+        if (isSortedAscending)
+        {
+            return "oi-arrow-bottom";
+        }
+        else
+        {
+            return "oi-arrow-top";
+        }
+    }
+
+    protected async Task SelectData(int id)
+    {
+        FormTitle = "FORM EDIT DATA KODE POS";
+        datakodeposModel = datakodeposList.Where(r => r.rowid == id).FirstOrDefault();
+
+        await hightlightRow();
+        await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupFormkodepos", "show");
+
+        StateHasChanged();
+
+    }
+
+    protected async Task NewData()
+    {
+        FormTitle = "FORM ADD NEW KODE POS";
+        datakodeposModel = new DataModel();
+        datakodeposModel.rowid = 0;
+        await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupFormkodepos", "show");
+        StateHasChanged();
+    }
+    public async void ExecuteAsyncSavedata()
+    {
+        if (string.IsNullOrEmpty(datakodeposModel.nokdpos))
+        {
+            await Focus("tbnokdpos");
+            modalTitle = "Kesalahan!";
+            messageWarning = "Kode harus diisi.";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            return;
+        }
+        if (string.IsNullOrEmpty(datakodeposModel.kelurahan))
+        {
+            await Focus("tbkelurahan");
+            modalTitle = "Kesalahan!";
+            messageWarning = "Kelurahan harus diisi.";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+
+            return;
+        }
+        if (string.IsNullOrEmpty(datakodeposModel.kecamatan))
+        {
+            await Focus("tbkecamatan");
+            modalTitle = "Kesalahan!";
+            messageWarning = "Kecamatan harus diisi.";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            return;
+        }
+        if (string.IsNullOrEmpty(datakodeposModel.kabupaten))
+        {
+            await Focus("tbkabupaten");
+            modalTitle = "Kesalahan!";
+            messageWarning = "Kabupaten harus diisi.";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            return;
+        }
+        if (string.IsNullOrEmpty(datakodeposModel.provinsi))
+        {
+            await Focus("tbprovinsi");
+            modalTitle = "Kesalahan!";
+            messageWarning = "Provinsi harus diisi.";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            return;
+        }
+        if (string.IsNullOrEmpty(datakodeposModel.jenis))
+        {
+            await Focus("tbjenis");
+            modalTitle = "Kesalahan!";
+            messageWarning = "Jenis harus diisi.";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            return;
+        }
+        if (datakodeposModel.rowid == 0)
+        {
+            if (IDatakodepos.cekDataSudahterdaftar("select count(*) jml from tb_kodepos_ind where LTRIM(RTRIM(upper(provinsi))) = @kode", datakodeposModel.provinsi.ToUpper().Trim()) > 0)
+            {
+                await Focus("tbprovinsi");
+                modalTitle = "Kesalahan!";
+                messageWarning = "Provinsi sudah terdaftar di dalam database.";
+                await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+                return;
+            }
+            if (IDatakodepos.cekDataSudahterdaftar("select count(*) jml from tb_kodepos_ind where LTRIM(RTRIM(upper(kabupaten))) = @kode AND LTRIM(RTRIM(upper(provinsi))) = '" + datakodeposModel.provinsi.ToUpper().Trim() + "' ", datakodeposModel.kabupaten.ToUpper().Trim()) > 0)
+            {
+                await Focus("tbkabupaten");
+                modalTitle = "Kesalahan!";
+                messageWarning = "Kabupaten sudah terdaftar di dalam database.";
+                await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+                return;
+            }
+        }
+
+
+        try
+        {
+            if (datakodeposModel.rowid == 0)
+            {
+                var datakodepos = System.Text.Json.JsonSerializer.Serialize(datakodeposModel);
+                var requestContent = new StringContent(datakodepos, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(globalservice.GetBaseURL() + "/api/datakodepos/insert", requestContent);
+                response.EnsureSuccessStatusCode();
+                if (response.IsSuccessStatusCode)
+                {
+                    await JSRuntime.InvokeVoidAsync("toastr.success", $"Data barhasil ditambahkan.");
+                    datakodeposList.Insert(0, datakodeposModel);
+                }
+            }
+            else
+            {
+                var datakodepos = System.Text.Json.JsonSerializer.Serialize(datakodeposModel);
+                var requestContent = new StringContent(datakodepos, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(globalservice.GetBaseURL() + "/api/datakodepos/update", requestContent);
+                response.EnsureSuccessStatusCode();
+                if (response.IsSuccessStatusCode)
+                {
+                    await JSRuntime.InvokeVoidAsync("toastr.success", $"Data barhasil di edit.");
+                    datakodeposList.Where(s => s.rowid == datakodeposModel.rowid).Select(s =>
+                    {
+                        s.nokdpos = datakodeposModel.nokdpos;
+                        s.kelurahan = datakodeposModel.kelurahan;
+                        s.kecamatan = datakodeposModel.kecamatan;
+                        s.kabupaten = datakodeposModel.kabupaten;
+                        s.provinsi = datakodeposModel.provinsi;
+                        s.jenis = datakodeposModel.jenis;
+
+                        return s;
+                    }).ToList();
+                }
+            }
+
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupFormkodepos", "hide");
+            StateHasChanged();
+
+        }
+        catch (Exception ex)
+        {
+            modalTitle = "Kesalahan!";
+            messageWarning = $"Terjadi Kesalahan. {ex.Message}";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            StateHasChanged();
+
+        }
+
+    }
+    protected async Task ConfirmDelete(int id)
+    {
+        datakodeposModel = datakodeposList.Where(r => r.rowid == id).FirstOrDefault();
+
+        await hightlightRow();
+        await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupKonfirmasiDelete", "show");
+
+        StateHasChanged();
+    }
+    protected async Task ExcecuteDeleteData()
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, globalservice.GetBaseURL() + "/api/datakodepos/delete/" + datakodeposModel.rowid);
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            if (response.IsSuccessStatusCode)
+            {
+                datakodeposList.Remove(datakodeposModel);
+                await JSRuntime.InvokeVoidAsync("toastr.success", $"Data barhasil di delete.");
+            }
+
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupKonfirmasiDelete", "hide");
+
+            StateHasChanged();
+        }
+        catch(Exception ex)
+        {
+            modalTitle = "Kesalahan!";
+            messageWarning = $"Terjadi Kesalahan. {ex.Message}";
+            await JSRuntime.InvokeVoidAsync("JsFunctionsmt.hideshowpopup", $"pupWarning", "show");
+            StateHasChanged();
+        }
+
+
+    }
+
+    public async Task hightlightRow()
+    {
+        await JSRuntime.InvokeVoidAsync("JsFunctionsmt.highlight_row", $"tblData");
+    }
+    public async Task Focus(string elementId)
+    {
+        await JSRuntime.InvokeVoidAsync("JsFunctionsmt.focusElement", elementId);
+    }
+    public async Task disenabform(string setdisenab)
+    {
+        await JSRuntime.InvokeVoidAsync("JsFunctionsmt.disenabButton", $"tbnokdpos", setdisenab);
+
+    }
+}
